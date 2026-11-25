@@ -29,6 +29,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE, "assist.db")
 CFG_PATH = os.path.join(BASE, "config.json")
 AGENT_EXE = os.path.join(BASE, "EPOLISI-assist.exe")
+SETUP_EXE = os.path.join(BASE, "EPOLISI-assist-Setup.exe")
 SESSION_TTL = 7 * 24 * 3600
 MAX_FAILS, FAIL_WINDOW = 5, 15 * 60  # не больше 5 неверных паролей за 15 минут с одного IP
 FAILS = {}
@@ -573,6 +574,12 @@ class Handler(BaseHTTPRequestHandler):
             with open(AGENT_EXE, "rb") as f:
                 return self.send(200, f.read(), "application/octet-stream",
                                  {"Content-Disposition": 'attachment; filename="EPOLISI-assist.exe"'})
+        if url.path == "/setup":
+            if not os.path.exists(SETUP_EXE):
+                return self.json({"error": "Файл ещё не загружен"}, 404)
+            with open(SETUP_EXE, "rb") as f:
+                return self.send(200, f.read(), "application/octet-stream",
+                                 {"Content-Disposition": 'attachment; filename="EPOLISI-assist-Setup.exe"'})
         if url.path == "/ws/agent":
             return self.ws_agent()
         if url.path == "/ws/view":
@@ -815,13 +822,13 @@ h2{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 <form onsubmit="login(event)"><input id="lu" placeholder="Логин" autocomplete="username" autofocus style="margin-bottom:8px">
 <input id="lp" type="password" placeholder="Пароль" autocomplete="current-password">
 <p id="le" style="color:var(--red);min-height:1em"></p><button class="pri" style="width:100%">Войти</button></form>
-<p style="margin-bottom:0;text-align:center"><a class="muted" href="/download">Скачать программу для агента</a></p></div>
+<p style="margin-bottom:0;text-align:center"><a class="muted" href="/setup">Скачать программу для агента</a></p></div>
 <div id="app" hidden>
 <header><h1>EPOLISI <b>assist</b></h1><span id="whoami" class="muted" style="font-size:12px"></span>
 <form id="qc" onsubmit="quick(event)"><input id="qid" placeholder="ID агента" inputmode="numeric"><button class="pri">Подключиться</button></form>
 <input id="q" placeholder="Поиск: название, ID, телефон, группа…" oninput="load()">
 <span class="sp"></span><button onclick="edit()">+ Добавить</button>
-<a class="btn" href="/download" title="Программа, которую ставят на компьютер агента">Скачать для агента</a>
+<a class="btn" href="/setup" title="Установщик — сам поставит программу, сделает ярлыки и, по желанию, автозапуск">Скачать для агента</a>
 <button id="btnUsers" hidden onclick="loadUsers();usersDlg.showModal()">Помощники</button>
 <button id="btnGroups" hidden onclick="openGroups()">Филиалы</button>
 <button id="btnLogs" hidden onclick="loadLogs();logsDlg.showModal()">Журнал</button>
