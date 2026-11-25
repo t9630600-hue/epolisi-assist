@@ -30,6 +30,7 @@ DB_PATH = os.path.join(BASE, "assist.db")
 CFG_PATH = os.path.join(BASE, "config.json")
 AGENT_EXE = os.path.join(BASE, "EPOLISI-assist.exe")
 SETUP_EXE = os.path.join(BASE, "EPOLISI-assist-Setup.exe")
+OPERATOR_EXE = os.path.join(BASE, "EPOLISI-operator.exe")
 SESSION_TTL = 7 * 24 * 3600
 MAX_FAILS, FAIL_WINDOW = 5, 15 * 60  # не больше 5 неверных паролей за 15 минут с одного IP
 FAILS = {}
@@ -580,6 +581,12 @@ class Handler(BaseHTTPRequestHandler):
             with open(SETUP_EXE, "rb") as f:
                 return self.send(200, f.read(), "application/octet-stream",
                                  {"Content-Disposition": 'attachment; filename="EPOLISI-assist-Setup.exe"'})
+        if url.path == "/operator":
+            if not os.path.exists(OPERATOR_EXE):
+                return self.json({"error": "Файл ещё не загружен"}, 404)
+            with open(OPERATOR_EXE, "rb") as f:
+                return self.send(200, f.read(), "application/octet-stream",
+                                 {"Content-Disposition": 'attachment; filename="EPOLISI-operator.exe"'})
         if url.path == "/ws/agent":
             return self.ws_agent()
         if url.path == "/ws/view":
@@ -829,6 +836,7 @@ h2{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 <input id="q" placeholder="Поиск: название, ID, телефон, группа…" oninput="load()">
 <span class="sp"></span><button onclick="edit()">+ Добавить</button>
 <a class="btn" href="/setup" title="Установщик — сам поставит программу, сделает ярлыки и, по желанию, автозапуск">Скачать для агента</a>
+<a class="btn" href="/operator" title="Программа для оператора — подключение и управление без браузера">Программа-оператор</a>
 <button id="btnUsers" hidden onclick="loadUsers();usersDlg.showModal()">Помощники</button>
 <button id="btnGroups" hidden onclick="openGroups()">Филиалы</button>
 <button id="btnLogs" hidden onclick="loadLogs();logsDlg.showModal()">Журнал</button>
