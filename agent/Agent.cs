@@ -24,8 +24,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("EPOLISI assist")]
 [assembly: AssemblyProduct("EPOLISI assist")]
 [assembly: AssemblyCompany("EPOLISI")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace EpolisiAssist
 {
@@ -181,7 +181,7 @@ namespace EpolisiAssist
             var fixedLink = new LinkLabel { Text = "Постоянный пароль…", AutoSize = true, Location = new Point(18, 324) };
             fixedLink.LinkClicked += delegate { AskFixedPw(); };
             Controls.Add(fixedLink);
-            var ver = new Label { Text = "v1.0", AutoSize = true, ForeColor = Color.Silver, Location = new Point(355, 326) };
+            var ver = new Label { Text = "v1.2", AutoSize = true, ForeColor = Color.Silver, Location = new Point(355, 326) };
             Controls.Add(ver);
 
             var menu = new ContextMenuStrip();
@@ -219,6 +219,54 @@ namespace EpolisiAssist
         public void SetClipboard(string text)
         {
             Ui(delegate { try { lastClip = text; Clipboard.SetText(text); } catch (Exception) { } });
+        }
+
+        // ---------- уведомление об обновлении: ненавязчиво, как в Телеграме — не звонить каждому ----------
+        bool updateOffered;
+
+        public void OfferUpdate(string version)
+        {
+            Ui(delegate
+            {
+                if (updateOffered) return;
+                updateOffered = true;
+                tray.BalloonTipClicked += delegate { ConfirmUpdate(version); };
+                tray.ShowBalloonTip(10000, "EPOLISI assist",
+                    "Доступна новая версия (" + version + "). Нажмите на это уведомление, чтобы обновить.", ToolTipIcon.Info);
+            });
+        }
+
+        void ConfirmUpdate(string version)
+        {
+            if (MessageBox.Show("Обновить EPOLISI assist до версии " + version + "?\nПрограмма ненадолго перезапустится.",
+                "EPOLISI assist", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                StartUpdate();
+        }
+
+        void StartUpdate()
+        {
+            try
+            {
+                string tmp = Path.Combine(Path.GetTempPath(), "EPOLISI-assist-update.exe");
+                using (var wc = new WebClient())
+                    wc.DownloadFile("https://assist.avto-sugurta.uz/download", tmp);
+                string target = Application.ExecutablePath;
+                string pid = Process.GetCurrentProcess().Id.ToString();
+                string bat = Path.Combine(Path.GetTempPath(), "epolisi_update_" + pid + ".bat");
+                string script =
+                    "@echo off\r\n:wait\r\n" +
+                    "tasklist /fi \"PID eq " + pid + "\" | find \"" + pid + "\" >nul\r\n" +
+                    "if not errorlevel 1 (\r\n  timeout /t 1 /nobreak >nul\r\n  goto wait\r\n)\r\n" +
+                    "copy /y \"" + tmp + "\" \"" + target + "\"\r\n" +
+                    "start \"\" \"" + target + "\"\r\n" +
+                    "del \"" + tmp + "\"\r\n" +
+                    "del \"%~f0\"\r\n";
+                File.WriteAllText(bat, script);
+                Process.Start(new ProcessStartInfo { FileName = bat, WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true });
+                reallyExit = true;
+                Close();
+            }
+            catch (Exception ex) { MessageBox.Show("Не удалось скачать обновление: " + ex.Message, "EPOLISI assist"); }
         }
 
         static Label Caption(string text, int y)
@@ -415,7 +463,7 @@ namespace EpolisiAssist
                 await sock.ConnectAsync(new Uri(Program.ServerUrl), CancellationToken.None);
                 await SendJson(new Dictionary<string, object> {
                     { "type", "hello" }, { "id", cfg.Id }, { "key", cfg.Key }, { "pw", ui.Password }, { "akey", cfg.Akey },
-                    { "name", Environment.MachineName + " / " + Environment.UserName }, { "ver", "1.1" } });
+                    { "name", Environment.MachineName + " / " + Environment.UserName }, { "ver", "1.2" } });
                 var buf = new byte[65536];
                 var ms = new MemoryStream();
                 while (sock.State == WebSocketState.Open)
@@ -448,6 +496,7 @@ namespace EpolisiAssist
                 case "stop": StopSession(); break;
                 case "ack": if (Interlocked.Decrement(ref inflight) < 0) Interlocked.Exchange(ref inflight, 0); break;
                 case "clip": ui.SetClipboard(m.ContainsKey("text") ? (string)m["text"] : ""); break;
+                case "update": ui.OfferUpdate(m.ContainsKey("version") ? (string)m["version"] : "?"); break;
                 case "q":
                     string mode = (string)m["mode"];
                     if (mode == "fast") { maxWidth = 1280; quality = 40; }

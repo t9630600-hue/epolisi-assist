@@ -58,6 +58,13 @@ def verify_pw(password, stored):
         return False
 
 
+def ver_tuple(v):
+    try:
+        return tuple(int(x) for x in re.findall(r"\d+", v) or [0])
+    except (ValueError, TypeError):
+        return (0,)
+
+
 def load_config():
     changed = False
     if not os.path.exists(CFG_PATH):
@@ -74,6 +81,9 @@ def load_config():
             changed = True
     if "cookie_secret" not in cfg:
         cfg["cookie_secret"] = secrets.token_hex(32)
+        changed = True
+    if "agent_version" not in cfg:
+        cfg["agent_version"] = "1.1"
         changed = True
     # пароли в открытом виде (старый формат или только что перенесённые) — хешируем
     for name, pw in list(cfg["users"].items()):
@@ -427,6 +437,10 @@ class Handler(BaseHTTPRequestHandler):
             if old:
                 old.ws.close()
             ws.send_text({"type": "ok"})
+            agent_ver = str(hello.get("ver", "1.0"))
+            latest = str(CFG.get("agent_version", "1.1"))
+            if ver_tuple(agent_ver) < ver_tuple(latest):
+                ws.send_text({"type": "update", "version": latest})
             while True:
                 msg = ws.recv()
                 if msg is None:
